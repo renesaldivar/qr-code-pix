@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerador Pix Dinâmico</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f4f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 30px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; }
+  .input-group { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 13px; font-weight: 600; color: #374151; }
+  input, select { width: 100%; padding: 12px; border: 1.5px solid #d1d5db; border-radius: 10px; font-size: 16px; outline: none; }
+  .btn-gerar { width: 100%; padding: 14px; background: #32bcad; color: #fff; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
+  .btn-copy { margin-top: 5px; padding: 10px; background: #22c55e; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .qr-area { display: none; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; }
+  .qr-area.visible { display: flex; }
+  #qrcode { padding: 10px; background: white; }
+  input#copyField { font-family: monospace; font-size: 10px; background: #f9fafb; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Configurações Pix</h2>
+  
+  <div class="input-group">
+    <label>Tipo de Chave</label>
+    <select id="tipoChave">
+      <option value="tel">Telefone</option>
+      <option value="email">E-mail</option>
+      <option value="cpf">CPF/CNPJ</option>
+      <option value="aleatoria">Chave Aleatória</option>
+    </select>
+  </div>
+
+  <div class="input-group">
+    <label>Chave Pix</label>
+    <input type="text" id="chavePix" placeholder="Insira sua chave aqui">
+  </div>
+
+  <div class="input-group">
+    <label>Valor (R$)</label>
+    <input type="number" id="valor" placeholder="0,00" step="0.01">
+  </div>
+
+  <button class="btn-gerar" onclick="gerarQR()">Gerar QR Code</button>
+
+  <div class="qr-area" id="qrArea">
+    <div id="qrcode"></div>
+    <input type="text" id="copyField" readonly>
+    <button class="btn-copy" id="btnCopy" onclick="copiarTexto()">Copiar Código</button>
+  </div>
+</div>
+
+<script>
+  window.onload = () => {
+    document.getElementById('tipoChave').value = localStorage.getItem('tipoChave') || 'tel';
+    document.getElementById('chavePix').value = localStorage.getItem('chavePix') || '';
+  };
+
+  function pad(str) { return String(str.length).padStart(2, '0') + str; }
+  
+  function crc16(str) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) {
+        crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+        crc &= 0xFFFF;
+      }
+    }
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  function gerarQR() {
+    const valor = parseFloat(document.getElementById('valor').value).toFixed(2);
+    const chave = document.getElementById('chavePix').value;
+    const tipo = document.getElementById('tipoChave').value;
+
+    localStorage.setItem('tipoChave', tipo);
+    localStorage.setItem('chavePix', chave);
+
+    const pixKey = '01' + pad(chave);
+    const mai = '0014BR.GOV.BCB.PIX' + pixKey;
+    const maiField = '26' + pad(mai);
+    const amount = '54' + pad(valor);
+    const payload = '000201' + maiField + '520400005303986' + amount + '5802BR' + '5901N' + '6001C' + '62070503001' + '6304';
+    const finalPayload = payload + crc16(payload);
+
+    document.getElementById('qrcode').innerHTML = '';
+    new QRCode(document.getElementById('qrcode'), { text: finalPayload, width: 220, height: 220 });
+    document.getElementById('copyField').value = finalPayload;
+    document.getElementById('qrArea').classList.add('visible');
+    document.getElementById('btnCopy').textContent = 'Copiar Código';
+  }
+
+  function copiarTexto() {
+    const campo = document.getElementById('copyField');
+    campo.select();
+    document.execCommand('copy');
+    
+    const btn = document.getElementById('btnCopy');
+    btn.textContent = 'Copiado!';
+    setTimeout(() => { btn.textContent = 'Copiar Código'; }, 2000);
+  }
+</script>
+</body>
+</html>
